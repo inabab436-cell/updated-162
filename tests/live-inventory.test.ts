@@ -95,9 +95,11 @@ describe("tolerant product wording", () => {
     expect(r.rule).toContain("ask him one short natural question");
   });
 
-  it("understands a typo in a latin/arabic word (تيشيرت → تيشرت)", () => {
+  it("never forces a typo (تيشيرت) onto a catalogue product — it stays unresolved", () => {
     const r = buildLiveInventoryResult(products, { product_name: "تيشيرت" });
-    expect(r.products[0]!.product_id).toBe("p2");
+    expect(r.resolved).toBe(false);
+    expect(r.matched).toBe(2);
+    expect(r.rule).toContain("ask him one short natural question");
   });
 
   it("still degrades to the full catalogue for a totally unknown word", () => {
