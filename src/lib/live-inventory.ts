@@ -49,45 +49,16 @@ export interface LiveInventoryQuery {
   product_name?: string | null;
 }
 
-/** Levenshtein distance, capped for short strings. */
-function distance(a: string, b: string): number {
-  if (a === b) return 0;
-  const m = a.length;
-  const n = b.length;
-  if (Math.abs(m - n) > 2) return 99;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++) {
-      cur[j] = Math.min(
-        prev[j]! + 1,
-        cur[j - 1]! + 1,
-        prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
-    }
-    prev = cur;
-  }
-  return prev[n]!;
-}
-
-/** A near-miss word (typo, dialect, missing long vowel) still counts as a hit. */
-function fuzzyHit(nameWord: string, keyWord: string): boolean {
-  if (!nameWord || !keyWord) return false;
-  if (nameWord === keyWord) return true;
-  if (nameWord.includes(keyWord) || keyWord.includes(nameWord)) return true;
-  // A short unknown word is too ambiguous to force onto a catalogue item.
-  // Return no match so the agent asks what the customer means instead.
-  if (Math.min(nameWord.length, keyWord.length) < 5) return false;
-  return distance(nameWord, keyWord) <= 2;
-}
-
-function words(value: unknown): string[] {
-  return String(value ?? "")
-    .split(/[^\p{L}\p{N}]+/u)
-    .map((w) => normKey(w))
-    .filter((w) => w.length > 1);
-}
-
+/**
+ * Name matching is EXACT or containment only — never similarity.
+ *
+ * A misspelled or near-miss word ("تيشيرت" for "تيشرت") must NOT be forced
+ * onto a catalogue product: resolving it would be a guess, and the model
+ * would then treat the guessed product as the customer's established intent.
+ * A miss degrades to the full live catalogue plus the unresolved rule, so
+ * the model resolves the reference from the conversation itself or asks the
+ * customer one short clarification question.
+ */
 function matchesQuery(product: LiveProduct, query: LiveInventoryQuery): boolean {
   const id = String(query.product_id ?? "").trim();
   if (id) return String(product.id ?? "") === id;
@@ -95,13 +66,7 @@ function matchesQuery(product: LiveProduct, query: LiveInventoryQuery): boolean 
   if (!key) return true;
   const name = normKey(product.name);
   if (name.length === 0) return false;
-  if (name === key || name.includes(key) || key.includes(name)) return true;
-  // Word-level tolerant comparison: the customer writes "هادي" for "هودي",
-  // "تيشيرت" for "تيشرت", or only one word of a longer catalogue name.
-  const nameWords = words(product.name);
-  const keyWords = words(query.product_name);
-  if (nameWords.length === 0 || keyWords.length === 0) return false;
-  return keyWords.some((kw) => nameWords.some((nw) => fuzzyHit(nw, kw)));
+  return name === key || name.includes(key) || key.includes(name);
 }
 
 /** Shape one product into its live, per-line stock answer. */
