@@ -201,10 +201,16 @@ export function checkSelectionAvailability(
     null;
 
   if (!product) {
+    // A name-matching miss is NOT proof of absence: the selection may carry a
+    // typo, a nickname or a shortened word. Never turn it into a denial —
+    // direct the agent to ask the customer what they mean instead.
     return {
       ...base,
       status: "product_not_found",
-      message: `المنتج «${selection.product_name}» غير موجود في الكتالوج الحالي. وضّح ذلك للعميل الآن واعرض بديلاً قبل الانتقال لأي خطوة تالية.`,
+      message:
+        `الاسم «${selection.product_name}» لم يطابق أي منتج في الكتالوج الحالي. هذا ليس دليلاً على أنه غير متوفر — قد يكون خطأً إملائياً أو اسماً مختصراً أو لقباً يستخدمه العميل. ` +
+        "ممنوع أن تخبر العميل أن المنتج غير موجود أو غير متوفر، وممنوع أن تعرض بديلاً بناءً على هذا اللبس. " +
+        "اسأل العميل سؤال توضيح واحداً فقط لتفهم قصده (مثال: مش فاهم قصد حضرتك، ممكن توضيح أكتر؟) ولا تذكر أي منتج أو سعر أو صورة قبل إجابته.",
     };
   }
 
